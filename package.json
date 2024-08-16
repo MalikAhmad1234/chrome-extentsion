@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "firebase-admin": "^12.3.0",
+    "stripe": "^16.6.0"
+  }
+}

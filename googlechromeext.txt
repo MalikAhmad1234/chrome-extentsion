@@ -1,0 +1,291 @@
+To extend the functionality of the Chrome extension to include downloads in Excel, PDF, and Google Sheets, and to follow the mechanisms described (using Browser Extension APIs, overlays, and data extraction), we'll make the following updates:
+
+1. **Include libraries for Excel and PDF generation**.
+2. **Update the content script to generate and download Excel and PDF files**.
+3. **Add functionality to export data to Google Sheets**.
+
+### Project Structure
+```
+gmb_scraper/
+â”œâ”€â”€ manifest.json
+â”œâ”€â”€ background.js
+â”œâ”€â”€ content.js
+â”œâ”€â”€ popup.html
+â”œâ”€â”€ popup.js
+â”œâ”€â”€ styles.css
+â”œâ”€â”€ libs/
+â”‚   â”œâ”€â”€ xlsx.full.min.js
+â”‚   â””â”€â”€ jsPDF.min.js
+```
+
+### manifest.json
+```json
+{
+  "manifest_version": 3,
+  "name": "GMB Scraper",
+  "version": "1.0",
+  "description": "Scrape Google My Business data and website analytics info.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/maps/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}
+```
+
+### background.js
+```js
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('GMB Scraper extension installed');
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'fetch_analytics_data') {
+    fetchAnalyticsData(request.url).then(data => sendResponse(data));
+    return true;  // Will respond asynchronously.
+  }
+});
+
+async function fetchAnalyticsData(url) {
+  const response = await fetch(url);
+  const text = await response.text();
+
+  const googleAnalytics = /UA-\d{4,9}-\d{1,4}/.test(text);
+  const facebookPixel = /facebook\.com\/tr\?id=\d+/.test(text);
+  const googleTag = /www.googletagmanager.com\/gtm.js/.test(text);
+  const googleAds = /ads.google.com/.test(text);
+
+  return { googleAnalytics, facebookPixel, googleTag, googleAds };
+}
+```
+
+### content.js
+Include the libraries for Excel and PDF generation at the top of the content script.
+```js
+const xlsxScript = document.createElement('script');
+xlsxScript.src = chrome.runtime.getURL('libs/xlsx.full.min.js');
+document.head.appendChild(xlsxScript);
+
+const jsPDFScript = document.createElement('script');
+jsPDFScript.src = chrome.runtime.getURL('libs/jsPDF.min.js');
+document.head.appendChild(jsPDFScript);
+
+document.addEventListener('DOMContentLoaded', () => {
+  createOverlay();
+});
+
+function createOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'gmb-scraper-overlay';
+  overlay.innerHTML = `
+    <button id="scrape-data-btn">Scrape Data</button>
+    <button id="download-csv-btn">Download CSV</button>
+    <button id="download-excel-btn">Download Excel</button>
+    <button id="download-pdf-btn">Download PDF</button>
+    <button id="download-google-sheets-btn">Download Google Sheets</button>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('scrape-data-btn').addEventListener('click', scrapeData);
+  document.getElementById('download-csv-btn').addEventListener('click', () => downloadData('csv'));
+  document.getElementById('download-excel-btn').addEventListener('click', () => downloadData('excel'));
+  document.getElementById('download-pdf-btn').addEventListener('click', () => downloadData('pdf'));
+  document.getElementById('download-google-sheets-btn').addEventListener('click', () => downloadData('google_sheets'));
+}
+
+let scrapedData = [];
+
+async function scrapeData() {
+  const results = [...document.querySelectorAll('.section-result')];
+  scrapedData = [];
+
+  for (const result of results) {
+    const name = result.querySelector('.section-result-title').innerText;
+    const phone = result.querySelector('.section-result-phone-number')?.innerText || 'N/A';
+    const website = result.querySelector('.section-result-website')?.href || 'N/A';
+    const category = result.querySelector('.section-result-details')?.innerText.split('Â·')[0] || 'N/A';
+    const reviews = result.querySelector('.section-result-num-ratings')?.innerText || 'N/A';
+    const rating = result.querySelector('.section-result-rating')?.innerText || 'N/A';
+    const email = 'N/A'; // Email scraping can be more complex and may not be available
+
+    const analyticsData = await fetchAnalyticsData(website);
+
+    scrapedData.push({
+      name,
+      phone,
+      website,
+      email,
+      category,
+      reviews,
+      rating,
+      ...analyticsData
+    });
+  }
+
+  console.log(scrapedData);
+}
+
+function fetchAnalyticsData(url) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'fetch_analytics_data', url }, resolve);
+  });
+}
+
+function downloadData(type) {
+  if (type === 'csv') {
+    downloadCSV(scrapedData);
+  } else if (type === 'excel') {
+    downloadExcel(scrapedData);
+  } else if (type === 'pdf') {
+    downloadPDF(scrapedData);
+  } else if (type === 'google_sheets') {
+    downloadGoogleSheets(scrapedData);
+  }
+}
+
+function downloadCSV(data) {
+  const csvContent = "data:text/csv;charset=utf-8," + 
+    ['Name', 'Phone', 'Website', 'Email', 'Category', 'Reviews', 'Rating', 'Google Analytics', 'Facebook Pixel', 'Google Tag', 'Google Ads']
+    .join(',') + '\n' +
+    data.map(e => [
+      e.name, e.phone, e.website, e.email, e.category, e.reviews, e.rating,
+      e.googleAnalytics, e.facebookPixel, e.googleTag, e.googleAds
+    ].join(',')).join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "gmb_data.csv");
+  document.body.appendChild(link);
+  link.click();
+}
+
+function downloadExcel(data) {
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'GMB Data');
+
+  XLSX.writeFile(wb, 'gmb_data.xlsx');
+}
+
+function downloadPDF(data) {
+  const doc = new jsPDF();
+  const columns = ['Name', 'Phone', 'Website', 'Email', 'Category', 'Reviews', 'Rating', 'Google Analytics', 'Facebook Pixel', 'Google Tag', 'Google Ads'];
+  const rows = data.map(e => [
+    e.name, e.phone, e.website, e.email, e.category, e.reviews, e.rating,
+    e.googleAnalytics, e.facebookPixel, e.googleTag, e.googleAds
+  ]);
+
+  doc.autoTable(columns, rows);
+  doc.save('gmb_data.pdf');
+}
+
+function downloadGoogleSheets(data) {
+  // Requires Google Sheets API integration
+  const params = {
+    spreadsheetId: 'your-spreadsheet-id',
+    range: 'Sheet1!A1',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    resource: {
+      values: [
+        ['Name', 'Phone', 'Website', 'Email', 'Category', 'Reviews', 'Rating', 'Google Analytics', 'Facebook Pixel', 'Google Tag', 'Google Ads'],
+        ...data.map(e => [
+          e.name, e.phone, e.website, e.email, e.category, e.reviews, e.rating,
+          e.googleAnalytics, e.facebookPixel, e.googleTag, e.googleAds
+        ])
+      ]
+    }
+  };
+
+  gapi.client.sheets.spreadsheets.values.append(params).then(response => {
+    console.log(response);
+  });
+}
+```
+
+### popup.html
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    /* Add your styles here */
+  </style>
+</head>
+<body>
+  <h1>GMB Scraper</h1>
+  <button id="start-scraping-btn">Start Scraping</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+```
+
+### popup.js
+```js
+document.getElementById('start-scraping-btn').addEventListener('click', () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.scripting.executeScript({
+      target: { tabId: tabs[0].id },
+      files: ['content.js']
+    });
+  });
+});
+```
+
+### styles.css
+```css
+#gmb-scraper-overlay {
+  position: fixed
+
+;
+  top: 10px;
+  right: 10px;
+  background: white;
+  border: 1px solid black;
+  padding: 10px;
+  z-index: 10000;
+}
+
+#gmb-scraper-overlay button {
+  display: block;
+  margin: 5px 0;
+}
+```
+
+### libs/xlsx.full.min.js and libs/jsPDF.min.js
+Download and include the minified versions of these libraries in the `libs` directory. You can find them on the official GitHub repositories or CDN links for [SheetJS (XLSX)](https://github.com/SheetJS/sheetjs) and [jsPDF](https://github.com/parallax/jsPDF).
+
+### Additional Notes
+- Ensure to replace `'your-spreadsheet-id'` with the actual ID of your Google Sheets.
+- The Google Sheets integration requires setting up OAuth2 and obtaining API credentials, which involves additional steps beyond this code snippet. You can follow the [Google Sheets API documentation](https://developers.google.com/sheets/api) for detailed instructions.
+
+This setup allows for scraping data from Google Maps and exporting it in various formats, utilizing Chrome's extension APIs, overlays, and dynamic data extraction.

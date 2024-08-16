@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "GMB Scraper",
+  "version": "1.0",
+  "description": "Scrape Google My Business data and website analytics info.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "cookies",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.google.com/maps/*", "https://maps.googleapis.com/*"],
+      "css": ["styles.css"],
+      "js": [
+        "libs/jquery.min.js", 
+        "libs/xlsx.full.min.js", 
+        "libs/jsPDF.min.js", 
+        "libs/jspdf.plugin.autotable.min.js",
+        "content.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "libs/xlsx.full.min.js",
+        "libs/jsPDF.min.js",
+        "libs/jspdf.plugin.autotable.min.js"
+      ],
+      "matches": [
+        "https://www.google.com/*"
+      ],
+      "use_dynamic_url": true
+    }
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}

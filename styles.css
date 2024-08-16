@@ -1,0 +1,67 @@
+#gmb-scraper-overlay {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: #d4af37;
+  border: 1px solid black;
+  padding: 10px 16px;
+  z-index: 10000;
+}
+
+#gmb-scraper-overlay button {
+  display: block;
+  margin: 8px 0;
+  cursor: pointer;
+}
+#gmb-scraper-overlay h3 {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+#QA0Szd .XltNde {
+  width: 600px !important;
+  max-width: calc(100% - 360px);
+}
+#QA0Szd div[jstcache='3'] .k7jAl.miFGmb {
+  width: 600px !important;
+}
+#QA0Szd .aIFcqe {
+  width: 100% !important;
+}
+
+.gb_chk {
+  position: absolute;
+  z-index: 3;
+  left: 5px;
+  top: 5px;
+}
+.gb_chk input {
+  accent-color: #1ca31c;
+}
+div.Nv2PK:has(input:checked) {
+  background: #ddf9e3;
+}
+.top_label {
+  position: fixed;
+  left: 73px;
+  width: calc(100% - 10px);
+  top: 60px;
+  background: #d4af37;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 5px;
+}
+.gmb_loading {
+  position: absolute;
+  z-index: 10001;
+  width: 100%;
+  height: 100%;
+  right: 0;
+  bottom: 0px;
+  background: rgba(255,255,255,0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  display: none;
+}
